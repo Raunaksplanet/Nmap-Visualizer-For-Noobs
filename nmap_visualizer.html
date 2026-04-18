@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nmap Visualizer</title>
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f4f0;
+    --color-background-tertiary: #eeece6;
+    --color-background-info: #e6f1fb;
+    --color-background-success: #eaf3de;
+    --color-background-warning: #faeeda;
+    --color-background-danger: #fcebeb;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #5f5e5a;
+    --color-text-tertiary: #888780;
+    --color-text-info: #185fa5;
+    --color-text-success: #3b6d11;
+    --color-text-warning: #854f0b;
+    --color-text-danger: #a32d2d;
+    --color-border-tertiary: rgba(0,0,0,0.12);
+    --color-border-secondary: rgba(0,0,0,0.22);
+    --color-border-primary: rgba(0,0,0,0.32);
+    --color-border-info: #378add;
+    --color-border-success: #639922;
+    --color-border-warning: #ba7517;
+    --color-border-danger: #e24b4a;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --font-serif: Georgia, "Times New Roman", serif;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --border-radius-xl: 16px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1e1e1c;
+      --color-background-secondary: #2a2a27;
+      --color-background-tertiary: #242422;
+      --color-background-info: #042c53;
+      --color-background-success: #173404;
+      --color-background-warning: #412402;
+      --color-background-danger: #501313;
+      --color-text-primary: #e8e6de;
+      --color-text-secondary: #b4b2a9;
+      --color-text-tertiary: #888780;
+      --color-text-info: #85b7eb;
+      --color-text-success: #97c459;
+      --color-text-warning: #ef9f27;
+      --color-text-danger: #f09595;
+      --color-border-tertiary: rgba(255,255,255,0.10);
+      --color-border-secondary: rgba(255,255,255,0.20);
+      --color-border-primary: rgba(255,255,255,0.30);
+      --color-border-info: #378add;
+      --color-border-success: #639922;
+      --color-border-warning: #ba7517;
+      --color-border-danger: #e24b4a;
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--color-background-tertiary); }
+  body { font-family: var(--font-mono); font-size: 13px; color: var(--color-text-primary); padding: 16px; }
+
+  .app { display: flex; height: calc(100vh - 32px); min-height: 600px; gap: 10px; }
+  .sidebar { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .main { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .panel { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 10px 12px; }
+
+  .slist { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; flex: 1; }
+  .sbtn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; border-radius: 6px; border: 0.5px solid transparent; background: transparent; cursor: pointer; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-primary); text-align: left; transition: background .12s; }
+  .sbtn:hover { background: var(--color-background-secondary); }
+  .sbtn.active { border-color: var(--color-border-info); background: var(--color-background-info); }
+  .sbtn-tag { font-weight: 500; min-width: 30px; }
+  .sbtn-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); margin-left: auto; white-space: nowrap; }
+
+  .fpanel { flex: 1; overflow-y: auto; min-height: 0; padding: 10px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); }
+  .fpanel::-webkit-scrollbar { width: 5px; }
+  .fpanel::-webkit-scrollbar-thumb { background: var(--color-border-secondary); border-radius: 3px; }
+  .fgroup-head { font-size: 9px; font-weight: 500; color: var(--color-text-tertiary); letter-spacing: .07em; text-transform: uppercase; padding: 6px 0 3px; border-top: 0.5px solid var(--color-border-tertiary); margin-top: 4px; }
+  .fgroup-head:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+  .frow { display: flex; align-items: flex-start; gap: 7px; padding: 5px 6px; border-radius: 5px; border: 0.5px solid transparent; cursor: pointer; transition: background .1s; }
+  .frow:hover { background: var(--color-background-secondary); }
+  .frow.on { border-color: var(--color-border-info); background: var(--color-background-info); }
+  .frow input[type=checkbox] { margin-top: 2px; flex-shrink: 0; accent-color: var(--color-text-info); }
+  .flabel { font-size: 11px; font-weight: 500; color: var(--color-text-info); min-width: 36px; flex-shrink: 0; }
+  .fdesc { font-size: 10px; color: var(--color-text-secondary); line-height: 1.4; }
+
+  .cmdbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .cmd-prompt { color: var(--color-text-secondary); }
+  .cmd-text { color: var(--color-text-primary); flex: 1; word-break: break-all; font-size: 12px; }
+  .speed-wrap { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-secondary); flex-shrink: 0; }
+  .run-btn { padding: 5px 12px; font-size: 11px; border-radius: 6px; border: 0.5px solid var(--color-border-secondary); background: transparent; cursor: pointer; font-family: var(--font-mono); color: var(--color-text-primary); white-space: nowrap; }
+  .run-btn:hover { background: var(--color-background-secondary); }
+  .run-btn.running { color: var(--color-text-warning); border-color: var(--color-border-warning); }
+
+  #cvs-wrap { flex: 1; min-height: 0; border-radius: 6px; border: 0.5px solid var(--color-border-tertiary); overflow: hidden; background: var(--color-background-primary); }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .logwrap { height: 170px; overflow-y: auto; border-radius: 6px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); flex-shrink: 0; }
+  .logwrap::-webkit-scrollbar { width: 5px; }
+  .logwrap::-webkit-scrollbar-thumb { background: var(--color-border-secondary); border-radius: 3px; }
+  .log-hdr { display: grid; grid-template-columns: 32px 90px 100px 55px 1fr; gap: 8px; padding: 4px 10px; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-secondary); font-size: 9px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: .06em; position: sticky; top: 0; z-index: 1; }
+  .log-body { padding: 2px 0; }
+  .log-row { display: grid; grid-template-columns: 32px 90px 100px 55px 1fr; gap: 8px; padding: 2px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 10px; align-items: center; }
+  .log-row:last-child { border-bottom: none; }
+  .l-seq { color: var(--color-text-tertiary); }
+  .l-dir-out { color: var(--color-text-info); }
+  .l-dir-in  { color: var(--color-text-success); }
+  .l-dir-rst { color: var(--color-text-danger); }
+  .l-dir-nse { color: var(--color-text-warning); }
+  .l-flag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; }
+  .l-port { color: var(--color-text-secondary); }
+  .l-note { color: var(--color-text-secondary); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 10px; color: var(--color-text-secondary); }
+  .ldot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .section-label { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="panel" style="display:flex;flex-direction:column;gap:6px;max-height:290px;">
+      <div class="section-label">Scan type</div>
+      <div class="slist" id="slist"></div>
+    </div>
+    <div class="fpanel" id="fpanel">
+      <div class="section-label">Flags &amp; NSE</div>
+      <div id="flist"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="panel cmdbar">
+      <span class="cmd-prompt">$</span>
+      <span class="cmd-text" id="cmd-text">nmap &lt;target&gt;</span>
+      <div class="speed-wrap">
+        <span>Speed</span>
+        <input type="range" id="spd" min="1" max="10" value="4" style="width:60px;">
+        <span id="spd-val">4</span>
+      </div>
+      <button class="run-btn" id="run-btn" onclick="runScan()">Run ↗</button>
+    </div>
+
+    <div class="panel" style="display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;padding:8px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span class="section-label" style="margin:0">Packet flow</span>
+        <div class="legend">
+          <span><span class="ldot" style="background:#3B8BD4"></span>→ probe</span>
+          <span><span class="ldot" style="background:#1D9E75"></span>← open</span>
+          <span><span class="ldot" style="background:#E24B4A"></span>← RST/ICMP</span>
+          <span><span class="ldot" style="background:#EF9F27"></span>UDP/NSE</span>
+        </div>
+      </div>
+      <div id="cvs-wrap"><canvas id="cvs"></canvas></div>
+    </div>
+
+    <div class="logwrap">
+      <div class="log-hdr">
+        <span>#</span><span>Direction</span><span>Flags/Type</span><span>Port</span><span>Note</span>
+      </div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SCANS = [
+  { id:'sS', label:'-sS', name:'SYN Stealth',  badge:'Stealth',       color:'#3B8BD4',
+    steps:[{f:'s',t2:'t',lbl:'SYN',col:'#3B8BD4'},{f:'t',t2:'s',lbl:'SYN-ACK',col:'#1D9E75',onlyOpen:true},{f:'s',t2:'t',lbl:'RST',col:'#E24B4A',onlyOpen:true},{f:'t',t2:'s',lbl:'RST-ACK',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sT', label:'-sT', name:'TCP Connect',   badge:'Full TCP',      color:'#1D9E75',
+    steps:[{f:'s',t2:'t',lbl:'SYN',col:'#3B8BD4'},{f:'t',t2:'s',lbl:'SYN-ACK',col:'#1D9E75',onlyOpen:true},{f:'s',t2:'t',lbl:'ACK',col:'#1D9E75',onlyOpen:true},{f:'s',t2:'t',lbl:'FIN',col:'#E24B4A',onlyOpen:true},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sU', label:'-sU', name:'UDP',           badge:'Connectionless',color:'#EF9F27',
+    steps:[{f:'s',t2:'t',lbl:'UDP probe',col:'#EF9F27'},{f:'t',t2:'s',lbl:'ICMP unreach',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sA', label:'-sA', name:'TCP ACK',       badge:'FW mapping',    color:'#639922',
+    steps:[{f:'s',t2:'t',lbl:'ACK',col:'#639922'},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A'}]},
+  { id:'sW', label:'-sW', name:'TCP Window',    badge:'Win probe',     color:'#5DCAA5',
+    steps:[{f:'s',t2:'t',lbl:'ACK',col:'#5DCAA5'},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A'}]},
+  { id:'sN', label:'-sN', name:'NULL',          badge:'Stealth',       color:'#888780',
+    steps:[{f:'s',t2:'t',lbl:'NULL pkt',col:'#888780'},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sF', label:'-sF', name:'FIN',           badge:'Stealth',       color:'#D4537E',
+    steps:[{f:'s',t2:'t',lbl:'FIN',col:'#D4537E'},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sX', label:'-sX', name:'XMAS',          badge:'Stealth',       color:'#7F77DD',
+    steps:[{f:'s',t2:'t',lbl:'FIN+PSH+URG',col:'#7F77DD'},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sM', label:'-sM', name:'Maimon',        badge:'BSD only',      color:'#F0997B',
+    steps:[{f:'s',t2:'t',lbl:'FIN+ACK',col:'#F0997B'},{f:'t',t2:'s',lbl:'RST',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sI', label:'-sI', name:'Idle/Zombie',   badge:'Blind',         color:'#AFA9EC',
+    steps:[{f:'s',t2:'z',lbl:'SYN-ACK',col:'#AFA9EC'},{f:'z',t2:'t',lbl:'SYN(spoof)',col:'#7F77DD'},{f:'t',t2:'z',lbl:'RST/SYN-ACK',col:'#E24B4A'},{f:'z',t2:'s',lbl:'IPID delta',col:'#AFA9EC'}]},
+  { id:'sY', label:'-sY', name:'SCTP INIT',     badge:'SCTP',          color:'#97C459',
+    steps:[{f:'s',t2:'t',lbl:'INIT',col:'#97C459'},{f:'t',t2:'s',lbl:'INIT-ACK',col:'#1D9E75',onlyOpen:true},{f:'t',t2:'s',lbl:'ABORT',col:'#E24B4A',onlyClosed:true}]},
+  { id:'sO', label:'-sO', name:'IP Protocol',   badge:'Proto scan',    color:'#FAC775',
+    steps:[{f:'s',t2:'t',lbl:'IP probe',col:'#FAC775'},{f:'t',t2:'s',lbl:'ICMP unreach',col:'#E24B4A',onlyClosed:true}]},
+];
+
+const FLAG_GROUPS = [
+  { head:'Host Discovery', flags:[
+    { key:'Pn', lbl:'-Pn',             desc:'Skip host discovery' },
+    { key:'sn', lbl:'-sn',             desc:'Ping scan only, no port scan' },
+    { key:'PS', lbl:'-PS443',          desc:'TCP SYN discovery on port 443' },
+    { key:'PE', lbl:'-PE',             desc:'ICMP echo discovery probe' },
+    { key:'tr', lbl:'--traceroute',    desc:'Trace hop path to target' },
+  ]},
+  { head:'Port & Timing', flags:[
+    { key:'pp', lbl:'-p-',             desc:'Scan all 65535 ports' },
+    { key:'FF', lbl:'-F',              desc:'Fast mode — top 100 ports' },
+    { key:'T0', lbl:'-T0',             desc:'Paranoid: 5 min between probes' },
+    { key:'T1', lbl:'-T1',             desc:'Sneaky: 15s between probes' },
+    { key:'T4', lbl:'-T4',             desc:'Aggressive: fast, reliable nets' },
+    { key:'T5', lbl:'-T5',             desc:'Insane: fastest, may miss ports' },
+    { key:'mr', lbl:'--min-rate=1000', desc:'Send at least 1000 pkts/sec' },
+    { key:'mx', lbl:'--max-retries=1', desc:'Limit probe retransmissions' },
+  ]},
+  { head:'Service & OS', flags:[
+    { key:'sV', lbl:'-sV',             desc:'Version detection / banner grab' },
+    { key:'OO', lbl:'-O',              desc:'OS fingerprinting (TTL, window)' },
+    { key:'AA', lbl:'-A',              desc:'Aggressive: OS+version+scripts' },
+    { key:'va', lbl:'--version-all',   desc:'Try all version probes (intensity 9)' },
+  ]},
+  { head:'Evasion & Spoof', flags:[
+    { key:'ff', lbl:'-f',              desc:'Fragment packets (bypass IDS/FW)' },
+    { key:'DD', lbl:'-D RND:10',       desc:'Decoy: 10 random source IPs' },
+    { key:'SS', lbl:'-S 1.2.3.4',      desc:'Spoof source IP address' },
+    { key:'sm', lbl:'--spoof-mac 0',   desc:'Spoof random MAC address' },
+    { key:'dl', lbl:'--data-length 25',desc:'Append random data to packets' },
+    { key:'tt', lbl:'--ttl 64',        desc:'Set custom IP TTL value' },
+    { key:'bs', lbl:'--badsum',        desc:'Send packets with bogus checksum' },
+  ]},
+  { head:'NSE Scripts', flags:[
+    { key:'sC',  lbl:'-sC',                         desc:'Default scripts (safe enum)' },
+    { key:'vuln',lbl:'--script=vuln',                desc:'CVE checks on open ports' },
+    { key:'auth',lbl:'--script=auth',                desc:'Auth bypass & default creds' },
+    { key:'henu',lbl:'--script=http-enum',           desc:'Enumerate web dirs/files' },
+    { key:'ms17',lbl:'--script=smb-vuln-ms17-010',   desc:'EternalBlue (MS17-010)' },
+    { key:'ftpa',lbl:'--script=ftp-anon',            desc:'FTP anonymous login test' },
+    { key:'sshb',lbl:'--script=ssh-brute',           desc:'SSH brute-force' },
+    { key:'dnsz',lbl:'--script=dns-zone-transfer',   desc:'DNS AXFR zone transfer' },
+    { key:'hrtb',lbl:'--script=ssl-heartbleed',      desc:'Heartbleed CVE-2014-0160' },
+    { key:'shck',lbl:'--script=http-shellshock',     desc:'Shellshock via HTTP headers' },
+    { key:'myql',lbl:'--script=mysql-empty-password',desc:'MySQL no-auth check' },
+    { key:'rdp', lbl:'--script=rdp-vuln-ms12-020',   desc:'RDP DoS vuln check' },
+  ]},
+  { head:'Output', flags:[
+    { key:'oN', lbl:'-oN out.txt',     desc:'Normal output to file' },
+    { key:'oX', lbl:'-oX out.xml',     desc:'XML output for parsers' },
+    { key:'oG', lbl:'-oG out.gnmap',   desc:'Grepable output' },
+    { key:'oA', lbl:'-oA out',         desc:'All three formats at once' },
+    { key:'vv', lbl:'-vv',             desc:'Verbose output' },
+    { key:'rs', lbl:'--reason',        desc:'Show why port is in its state' },
+    { key:'op', lbl:'--open',          desc:'Show only open ports' },
+    { key:'pt', lbl:'--packet-trace',  desc:'Show all packets sent/received' },
+  ]},
+];
+
+let activeScan = SCANS[0];
+const activeFlags = new Map();
+let running = false, animId = null, pktSeq = 0, packets = [], portResults = [];
+
+function buildScanList() {
+  const el = document.getElementById('slist');
+  SCANS.forEach(function(s) {
+    const btn = document.createElement('button');
+    btn.className = 'sbtn' + (s === activeScan ? ' active' : '');
+    btn.id = 'sbtn-' + s.id;
+    btn.type = 'button';
+    btn.innerHTML = '<span class="sbtn-tag">' + s.label + '</span><span>' + s.name + '</span><span class="sbtn-badge">' + s.badge + '</span>';
+    btn.addEventListener('click', function() {
+      activeScan = s;
+      document.querySelectorAll('.sbtn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      updateCmd();
+    });
+    el.appendChild(btn);
+  });
+}
+
+function buildFlagList() {
+  const el = document.getElementById('flist');
+  FLAG_GROUPS.forEach(function(grp) {
+    const head = document.createElement('div');
+    head.className = 'fgroup-head';
+    head.textContent = grp.head;
+    el.appendChild(head);
+    grp.flags.forEach(function(f) {
+      const row = document.createElement('label');
+      row.className = 'frow';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.addEventListener('change', function() {
+        if (cb.checked) { activeFlags.set(f.key, f.lbl); row.classList.add('on'); }
+        else { activeFlags.delete(f.key); row.classList.remove('on'); }
+        updateCmd();
+      });
+      const lspan = document.createElement('span');
+      lspan.className = 'flabel';
+      lspan.title = f.lbl;
+      lspan.textContent = f.lbl.length > 12 ? f.lbl.slice(0,11)+'…' : f.lbl;
+      const dspan = document.createElement('span');
+      dspan.className = 'fdesc';
+      dspan.textContent = f.desc;
+      row.appendChild(cb); row.appendChild(lspan); row.appendChild(dspan);
+      el.appendChild(row);
+    });
+  });
+}
+
+function updateCmd() {
+  let cmd = 'nmap ' + activeScan.label;
+  activeFlags.forEach(function(lbl) { cmd += ' ' + lbl; });
+  cmd += ' <target>';
+  document.getElementById('cmd-text').textContent = cmd;
+}
+
+document.getElementById('spd').addEventListener('input', function() {
+  document.getElementById('spd-val').textContent = this.value;
+});
+function getSpeed() { return parseInt(document.getElementById('spd').value, 10); }
+
+const cvs = document.getElementById('cvs');
+const ctx = cvs.getContext('2d');
+function resize() {
+  const w = cvs.parentElement.clientWidth, h = cvs.parentElement.clientHeight;
+  cvs.width = w * devicePixelRatio; cvs.height = h * devicePixelRatio;
+  cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+new ResizeObserver(resize).observe(cvs.parentElement);
+resize();
+
+function gv(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function drawNode(x, y, label, sub, col) {
+  ctx.save();
+  ctx.fillStyle = col + '22'; ctx.strokeStyle = col; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.roundRect(x-42, y-20, 84, 40, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = col; ctx.font = '500 11px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y - 6);
+  ctx.fillStyle = gv('--color-text-secondary'); ctx.font = '9px monospace';
+  ctx.fillText(sub, x, y + 7);
+  ctx.restore();
+}
+
+function drawPkt(p) {
+  if (p.prog <= 0 || p.prog >= 1) return;
+  const W = cvs.width / devicePixelRatio, H = cvs.height / devicePixelRatio;
+  const zx = W * 0.5;
+  const sx = p.f === 's' ? W*0.12 : p.f === 'z' ? zx : W*0.88;
+  const tx = p.t2 === 't' ? W*0.88 : p.t2 === 'z' ? zx : W*0.12;
+  const px = sx + (tx - sx) * p.prog;
+  const py = p.y;
+  const alpha = Math.min(1, p.prog * 12, (1 - p.prog) * 12);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = p.col; ctx.fillStyle = p.col + '18'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.roundRect(px - 20, py - 9, 40, 18, 3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = p.col; ctx.font = '9px monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(p.lbl.length > 11 ? p.lbl.slice(0,10)+'…' : p.lbl, px, py);
+  ctx.restore();
+}
+
+function addLog(dir, flags, port, note, col) {
+  pktSeq++;
+  const wrap = document.getElementById('log-body').parentElement;
+  const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 32;
+  const body = document.getElementById('log-body');
+  const row = document.createElement('div');
+  row.className = 'log-row';
+  const dirCls = dir === 'attacker →' ? 'l-dir-out' : dir === '← target' ? 'l-dir-in' : dir === 'NSE/OS' ? 'l-dir-nse' : 'l-dir-rst';
+  row.innerHTML =
+    '<span class="l-seq">' + pktSeq + '</span>' +
+    '<span class="' + dirCls + '">' + dir + '</span>' +
+    '<span><span class="l-flag" style="background:' + col + '22;color:' + col + ';border:0.5px solid ' + col + '66">' + flags + '</span></span>' +
+    '<span class="l-port">:' + port + '</span>' +
+    '<span class="l-note">' + note + '</span>';
+  body.appendChild(row);
+  if (atBottom) wrap.scrollTop = wrap.scrollHeight;
+}
+
+const PORTS = [21, 22, 23, 25, 53, 80, 443, 3306, 3389, 8080];
+const OPEN_PORTS = new Set([22, 80, 443]);
+
+function initSim() {
+  packets = []; portResults = []; pktSeq = 0;
+  document.getElementById('log-body').innerHTML = '';
+  const spd = getSpeed();
+  const W = cvs.width / devicePixelRatio, H = cvs.height / devicePixelRatio;
+  const laneH = (H - 80) / PORTS.length;
+  PORTS.forEach(function(port, i) {
+    const open = OPEN_PORTS.has(port) || Math.random() < 0.2;
+    const y = 50 + i * laneH + laneH / 2;
+    portResults.push({ port: port, open: open, y: y, logged: false });
+    activeScan.steps.forEach(function(step, si) {
+      if (step.onlyOpen && !open) return;
+      if (step.onlyClosed && open) return;
+      const baseDelay = i * Math.max(0.08, 0.4 - spd * 0.03);
+      packets.push({ f: step.f, t2: step.t2, lbl: step.lbl, col: step.col, y: y,
+        portIdx: i, stepIdx: si, prog: -(baseDelay + si * 0.25),
+        speed: 0.004 + spd * 0.0012, logDone: false });
+    });
+  });
+}
+
+function animate() {
+  if (!running) return;
+  const W = cvs.width / devicePixelRatio, H = cvs.height / devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+  const spd = getSpeed();
+  const speedMult = 0.25 + spd * 0.075;
+  let allDone = true;
+
+  portResults.forEach(function(pr) {
+    ctx.save();
+    ctx.strokeStyle = gv('--color-border-tertiary'); ctx.lineWidth = 0.5; ctx.setLineDash([3,6]);
+    ctx.beginPath(); ctx.moveTo(W*0.12+43, pr.y); ctx.lineTo(W*0.88-43, pr.y); ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = pr.logged ? (pr.open ? gv('--color-text-success') : gv('--color-text-danger')) : gv('--color-text-tertiary');
+    ctx.font = '9px monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(':' + pr.port, W*0.88 - 48, pr.y);
+    ctx.restore();
+  });
+
+  packets.forEach(function(p) {
+    p.prog += p.speed * speedMult;
+    if (p.prog < 1) allDone = false;
+    drawPkt(p);
+    if (!p.logDone && p.prog >= 1) {
+      p.logDone = true;
+      const pr = portResults[p.portIdx];
+      const dir = p.f === 's' ? 'attacker →' : (p.col === '#E24B4A' ? '← RST/ICMP' : '← target');
+      addLog(dir, p.lbl, pr.port, pr.open ? 'open' : 'closed', p.col);
+      if (!pr.logged) pr.logged = true;
+    }
+  });
+
+  if (activeScan.id === 'sI') drawNode(W*0.5, H*0.3, 'ZOMBIE', 'idle host', '#AFA9EC');
+  drawNode(W*0.12, H*0.5, 'ATTACKER', activeScan.label, activeScan.color);
+  drawNode(W*0.88, H*0.5, 'TARGET', '0.0.0.0', '#888780');
+
+  if (allDone && packets.length > 0) {
+    cancelAnimationFrame(animId);
+    running = false;
+    document.getElementById('run-btn').textContent = 'Run ↗';
+    document.getElementById('run-btn').classList.remove('running');
+    const open = portResults.filter(function(p) { return p.open; }).length;
+    addLog('—', 'DONE', '*', open + ' open / ' + (PORTS.length - open) + ' closed', '#639922');
+    if (activeFlags.has('vuln'))  addLog('NSE/OS','vuln',8080,'CVE-2023-44487 H2C smuggling [MEDIUM]','#E24B4A');
+    if (activeFlags.has('ms17'))  addLog('NSE/OS','MS17-010',445,'VULNERABLE — EternalBlue RCE','#E24B4A');
+    if (activeFlags.has('hrtb'))  addLog('NSE/OS','heartbleed',443,'NOT vulnerable','#1D9E75');
+    if (activeFlags.has('ftpa'))  addLog('NSE/OS','ftp-anon',21,'Anonymous login ALLOWED','#EF9F27');
+    if (activeFlags.has('henu'))  addLog('NSE/OS','http-enum',80,'/admin/ /backup/ /.git/ found','#EF9F27');
+    if (activeFlags.has('dnsz'))  addLog('NSE/OS','dns-axfr',53,'Zone transfer SUCCESS — records leaked','#E24B4A');
+    if (activeFlags.has('myql'))  addLog('NSE/OS','mysql',3306,'root login with NO password','#E24B4A');
+    if (activeFlags.has('sshb'))  addLog('NSE/OS','ssh-brute',22,'admin:admin found','#EF9F27');
+    if (activeFlags.has('rdp'))   addLog('NSE/OS','ms12-020',3389,'RDP DoS — VULNERABLE','#E24B4A');
+    if (activeFlags.has('shck'))  addLog('NSE/OS','shellshock',80,'CVE-2014-6271 — VULNERABLE','#E24B4A');
+    if (activeFlags.has('auth'))  addLog('NSE/OS','auth',80,'Default creds found: admin/admin','#EF9F27');
+    if (activeFlags.has('OO'))    addLog('NSE/OS','OS detect','*','Linux 5.15 Ubuntu — TTL=64 win=65535','#3B8BD4');
+    if (activeFlags.has('sV'))    addLog('NSE/OS','versions','*','22/OpenSSH-8.9  80/nginx-1.24  443/nginx','#3B8BD4');
+    if (activeFlags.has('tr'))    addLog('NSE/OS','traceroute','*','3 hops: .1.1 → 10.0.0.1 → target','#3B8BD4');
+    return;
+  }
+  animId = requestAnimationFrame(animate);
+}
+
+function runScan() {
+  if (running) return;
+  running = true;
+  document.getElementById('run-btn').textContent = 'Scanning…';
+  document.getElementById('run-btn').classList.add('running');
+  initSim();
+  animate();
+}
+
+buildScanList();
+buildFlagList();
+updateCmd();
+
+(function idleDraw() {
+  const W = cvs.width / devicePixelRatio, H = cvs.height / devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+  drawNode(W*0.12, H*0.5, 'ATTACKER', '-sS', '#3B8BD4');
+  drawNode(W*0.88, H*0.5, 'TARGET', '0.0.0.0', '#888780');
+  ctx.fillStyle = gv('--color-text-tertiary');
+  ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('select scan type  →  toggle flags  →  press Run ↗', W/2, H/2);
+})();
+</script>
+</body>
+</html>
